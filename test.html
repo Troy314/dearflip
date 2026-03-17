@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Flipbook</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/css/dflip.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/css/themify-icons.min.css">
+  <style>
+    body { margin: 0; background: #222; }
+
+    #flipbook-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* YouTube overlay on the first page */
+    #video-overlay {
+      position: absolute;
+      /* Adjust these values to position/size the video over the first page */
+      top: 10%;
+      left: 5%;
+      width: 38%;        /* roughly half the flipbook = one page width */
+      aspect-ratio: 16/9;
+      z-index: 100;
+      pointer-events: auto;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: opacity 0.4s;
+    }
+
+    #video-overlay iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* Hide overlay when user flips away from page 1 */
+    #video-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="flipbook-wrapper">
+
+    <!-- YouTube video overlay on first page -->
+    <div id="video-overlay">
+      <iframe
+        src="https://www.youtube.com/embed/7sxWN7eT5l0?start=5&autoplay=0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen>
+      </iframe>
+    </div>
+
+    <!-- DearFlip flipbook -->
+    <div class="_df_book" id="book_pdf"></div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/js/libs/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/js/dflip.min.js"></script>
+
+  <script>
+    var option_book_pdf = {
+      source: 'https://your-site.com/path/to/file.pdf', // 👈 replace with your PDF
+      webgl: true,
+
+      // Hide/show video overlay based on current page
+      onFlip: function(flipbook) {
+        var currentPage = flipbook.page;
+        var overlay = document.getElementById('video-overlay');
+        // Show only on page 1 (or pages 1-2 in spread view)
+        if (currentPage <= 1) {
+          overlay.classList.remove('hidden');
+        } else {
+          overlay.classList.add('hidden');
+          // Pause the video by reloading the iframe src (stops audio too)
+          var iframe = overlay.querySelector('iframe');
+          iframe.src = iframe.src;
+        }
+      }
+    };
+  </script>
+
+</body>
+</html>

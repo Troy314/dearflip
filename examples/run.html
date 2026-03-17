@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DearFlip with YouTube on Page 1</title>
+
+  <!-- DearFlip CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/css/dflip.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/css/themify-icons.min.css">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+    }
+
+    #flipbook-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    #yt-overlay {
+      position: absolute;
+      top: 10%;
+      left: 5%;
+      width: 45%;
+      aspect-ratio: 16 / 9;
+      z-index: 9999;
+      display: none; /* hidden until flipbook is ready */
+    }
+
+    /* The YT API injects an <iframe> inside this div */
+    #yt-player-container {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div id="flipbook-wrapper">
+  <!-- DearFlip flipbook -->
+  <div class="_df_book" id="my_flipbook"></div>
+
+  <!-- YouTube overlay container -->
+  <div id="yt-overlay">
+    <div id="yt-player-container"></div>
+  </div>
+</div>
+
+<!-- jQuery -->
+<script src="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/js/libs/jquery.min.js"></script>
+<!-- DearFlip JS -->
+<script src="https://cdn.jsdelivr.net/npm/@dearhive/dearflip-jquery-flipbook/dflip/js/dflip.min.js"></script>
+<!-- YouTube IFrame API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+  // ── Flipbook config ──────────────────────────────────────────────
+  var option_my_flipbook = {
+    source: 'example-assets/books/intro.pdf', // ← replace with your PDF path
+    webgl: true
+  };
+
+  // ── YouTube Player ───────────────────────────────────────────────
+  var ytPlayer = null;
+  var ytReady  = false;
+
+  // Called automatically by the YouTube API once the script loads
+  function onYouTubeIframeAPIReady() {
+    ytPlayer = new YT.Player('yt-player-container', {
+      videoId: '7sxWN7eT5l0',
+      playerVars: {
+        start:    5,        // matches &t=5s in original URL
+        autoplay: 0,
+        rel:      0,        // don't show unrelated videos at end
+        modestbranding: 1
+      },
+      events: {
+        onReady: function() {
+          ytReady = true;
+        }
+      }
+    });
+  }
+
+  // ── Overlay logic ────────────────────────────────────────────────
+  function updateOverlay(pageNumber) {
+    var overlay = document.getElementById('yt-overlay');
+    if (pageNumber === 1) {
+      overlay.style.display = 'block';
+    } else {
+      overlay.style.display = 'none';
+      // Pause the video when the user flips away from page 1
+      if (ytReady && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+        ytPlayer.pauseVideo();
+      }
+    }
+  }
+
+  // ── DearFlip hooks ───────────────────────────────────────────────
+
+  // Fires once the PDF has fully loaded — show overlay if starting on page 1
+  DFLIP.defaults.onReady = function(app) {
+    updateOverlay(app.currentPageNumber);
+  };
+
+  // Fires every time the user flips a page
+  DFLIP.defaults.onPageChanged = function(app) {
+    updateOverlay(app.currentPageNumber);
+  };
+</script>
+
+</body>
+</html>
