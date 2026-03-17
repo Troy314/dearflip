@@ -10,18 +10,9 @@
 <link href="../dflip/css/themify-icons.min.css" rel="stylesheet" type="text/css">
 
 <style>
-  /* Shared wrapper provides the positioning context */
-  #book-wrapper {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-  }
-
-  /* Overlay floats over the top-right of the wrapper */
+  /* Fixed to viewport so CSS transforms on the book canvas don't move it */
   #clock-overlay {
-    position: absolute;
-    top: 20px;
-    right: 20px;
+    position: fixed;
     width: 120px;
     height: 120px;
     z-index: 9999;
@@ -29,13 +20,17 @@
     border-radius: 50%;
     box-shadow: 0 4px 18px rgba(0,0,0,0.55);
     overflow: hidden;
-    opacity: 1;
-    transition: opacity 0.4s ease;
+    opacity: 0;
+    transition: opacity 0.4s ease, top 0.05s linear, right 0.05s linear;
+    visibility: hidden; /* hidden until JS places it correctly */
   }
 
-  #clock-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
+  #clock-overlay.placed {
+    visibility: visible;
+  }
+
+  #clock-overlay.page-visible {
+    opacity: 1;
   }
 
   #clock-overlay img {
@@ -84,49 +79,78 @@
 <script>
 (function () {
   var overlay  = document.getElementById('clock-overlay');
-  var bookWrap = document.getElementById('df_manual_book');
+  var bookEl   = document.getElementById('df_manual_book');
 
-  /**
-   * Position the overlay relative to the flipbook wrapper.
-   * Called once on load and again on window resize.
-   */
+  // ── Margin from top-right corner of the rendered book page (px) ──
+  var MARGIN_TOP   = 20;
+  var MARGIN_RIGHT = 20;
+  var OVERLAY_SIZE = 120;
+
+  var onPage1 = true; // page 1 is shown on load
+
+  // ─────────────────────────────────────────────────────────────────
+  // findPageCanvas
+  // DFlip renders each page into a <canvas> (WebGL) or <img> inside
+  // .df-page or .df-page-front elements.  We locate the first-page
+  // surface so we can track its real viewport rect even after zoom/pan.
+  // ─────────────────────────────────────────────────────────────────
+  function findPageSurface() {
+    // Try WebGL canvas first (webgl="true")
+    var canvas = bookEl.querySelector('canvas');
+    if (canvas) return canvas;
+    // Fallback: first .df-page or .df-page-front child
+    var page = bookEl.querySelector('.df-page-front, .df-page, .df-book-page');
+    if (page) return page;
+    // Last resort: the book element itself
+    return bookEl;
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // positionOverlay
+  // Reads the *current* viewport rect of the rendered surface (which
+  // changes every frame while the user zooms/pans) and pins the
+  // overlay to its top-right corner using fixed coordinates.
+  // ─────────────────────────────────────────────────────────────────
   function positionOverlay() {
-    var rect = bookWrap.getBoundingClientRect();
-    // Place it inside the top-right corner of the book container
-    overlay.style.top  = '200px';
-    overlay.style.right = '400px';
+    var surface = findPageSurface();
+    var rect    = surface.getBoundingClientRect();
+
+    // top-right of the surface, inset by the margin values
+    var top   = rect.top  + MARGIN_TOP;
+    var right = window.innerWidth - rect.right + MARGIN_RIGHT;
+
+    // Clamp so the overlay never leaves the viewport
+    top   = Math.max(0, Math.min(top,   window.innerHeight - OVERLAY_SIZE));
+    right = Math.max(0, Math.min(right, window.innerWidth  - OVERLAY_SIZE));
+
+    overlay.style.top   = top   + 'px';
+    overlay.style.right = right + 'px';
+    overlay.classList.add('placed');
   }
 
-  /**
-   * Show or hide the overlay depending on whether page 1 is visible.
-   * DFlip stores the current page in the flipbook's data / jQuery object.
-   * We check both the standard jQuery data key and a DOM attribute.
-   */
-  function syncOverlay() {
-    var currentPage = 1; // default assumption
-
-    // Try to read from DFlip's jQuery data (key varies by version)
-    if (window.jQuery) {
-      var $book = jQuery('#df_manual_book');
-      var dfData = $book.data('dflip') || $book.data('3dflipbook') || $book.data('df');
-      if (dfData && dfData.currentPage !== undefined) {
-        currentPage = dfData.currentPage;
-      } else if (dfData && dfData.page !== undefined) {
-        currentPage = dfData.page;
-      }
-    }
-
-    // Page 1 → show overlay; any other page → hide
-    if (currentPage === 1) {
-      overlay.classList.add('visible');
-    } else {
-      overlay.classList.remove('visible');
-    }
+  // ─────────────────────────────────────────────────────────────────
+  // Continuous tracking loop via requestAnimationFrame
+  // This is the key fix: we reposition every single frame, so zoom,
+  // pan, resize, and browser-zoom all stay in sync automatically.
+  // ─────────────────────────────────────────────────────────────────
+  function trackLoop() {
+    positionOverlay();
+    requestAnimationFrame(trackLoop);
   }
 
-  /**
-   * Normalise whatever DFlip passes as the page argument to a plain integer.
-   */
+  // ─────────────────────────────────────────────────────────────────
+  // Page-visibility helpers
+  // ─────────────────────────────────────────────────────────────────
+  function showOverlay() {
+    onPage1 = true;
+    overlay.classList.add('page-visible');
+  }
+
+  function hideOverlay() {
+    onPage1 = false;
+    overlay.classList.remove('page-visible');
+  }
+
   function parsePage(page) {
     if (page === null || page === undefined) return null;
     if (typeof page === 'number') return page;
@@ -137,99 +161,57 @@
     return isNaN(n) ? null : n;
   }
 
-  function handlePageChange(page) {
-    var p = parsePage(page);
-    // If we couldn't parse, fall back to polling the DOM attribute
-    if (p === null) p = readPageFromDOM();
-    if (p === 1) {
-      overlay.classList.add('visible');
-    } else {
-      overlay.classList.remove('visible');
-    }
-  }
-
-  /**
-   * Fallback: read the current page from DFlip's data stored on the element.
-   */
   function readPageFromDOM() {
     if (!window.jQuery) return null;
-    var $book = jQuery('#df_manual_book');
-    var d = $book.data('dflip') || $book.data('3dflipbook') || $book.data('df');
-    if (!d) return null;
-    return d.currentPage || d.page || null;
+    var d = jQuery('#df_manual_book').data('dflip') ||
+            jQuery('#df_manual_book').data('3dflipbook') ||
+            jQuery('#df_manual_book').data('df');
+    return d ? (d.currentPage || d.page || null) : null;
   }
 
-  /**
-   * Poll-based safety net: every 300 ms check the real current page so we
-   * never get stuck in the wrong state if a callback was missed.
-   */
-  function startPolling() {
-    setInterval(function () {
-      var p = readPageFromDOM();
-      if (p === null) return; // book not ready yet
-      if (p === 1) {
-        overlay.classList.add('visible');
-      } else {
-        overlay.classList.remove('visible');
-      }
-    }, 300);
+  function handlePageChange(page) {
+    var p = parsePage(page);
+    if (p === null) p = readPageFromDOM();
+    if (p === 1) showOverlay(); else hideOverlay();
   }
 
-  /**
-   * DFlip exposes global callbacks via window.DFLIP.defaults.
-   * We hook into onReady (book loaded) and onChange / onFlip (page turned).
-   */
+  // ─────────────────────────────────────────────────────────────────
+  // DFlip hooks
+  // ─────────────────────────────────────────────────────────────────
   function initDFlipHooks() {
-    if (!window.DFLIP) {
-      setTimeout(initDFlipHooks, 100);
-      return;
+    if (!window.DFLIP) { setTimeout(initDFlipHooks, 100); return; }
+
+    var d = window.DFLIP.defaults;
+
+    // onReady
+    var _oR = d.onReady;
+    d.onReady = function (fb) {
+      if (_oR) _oR.call(this, fb);
+      showOverlay();                    // page 1 on load
+      trackLoop();                      // start the RAF tracking loop
+      // 300 ms poll as belt-and-suspenders for page state
+      setInterval(function () {
+        var p = readPageFromDOM();
+        if (p === null) return;
+        if (p === 1) showOverlay(); else hideOverlay();
+      }, 300);
+    };
+
+    function wrapCb(orig, key) {
+      d[key] = function (fb, page) {
+        if (orig) orig.call(this, fb, page);
+        var p = parsePage(page);
+        if (p === null && fb) p = parsePage(fb.currentPage || fb.page);
+        handlePageChange(p !== null ? p : readPageFromDOM());
+      };
     }
 
-    var defaults = window.DFLIP.defaults;
-
-    // ---- onReady ----
-    var _origReady = defaults.onReady;
-    defaults.onReady = function (flipbook) {
-      if (_origReady) _origReady.call(this, flipbook);
-      positionOverlay();
-      overlay.classList.add('visible'); // page 1 on load
-      startPolling(); // belt-and-suspenders for missed callbacks
-    };
-
-    // ---- onFlip (fired on every page turn in most DFlip versions) ----
-    var _origFlip = defaults.onFlip;
-    defaults.onFlip = function (flipbook, page) {
-      if (_origFlip) _origFlip.call(this, flipbook, page);
-      // DFlip sometimes passes the *destination* page, sometimes the flipbook object
-      var p = parsePage(page);
-      if (p === null && flipbook) p = parsePage(flipbook.currentPage || flipbook.page);
-      handlePageChange(p !== null ? p : readPageFromDOM());
-    };
-
-    // ---- onChange (alternative callback name in some builds) ----
-    var _origChange = defaults.onChange;
-    defaults.onChange = function (flipbook, page) {
-      if (_origChange) _origChange.call(this, flipbook, page);
-      var p = parsePage(page);
-      if (p === null && flipbook) p = parsePage(flipbook.currentPage || flipbook.page);
-      handlePageChange(p !== null ? p : readPageFromDOM());
-    };
-
-    // ---- onPageLoad (fired after each individual page renders) ----
-    var _origPageLoad = defaults.onPageLoad;
-    defaults.onPageLoad = function (flipbook, page) {
-      if (_origPageLoad) _origPageLoad.call(this, flipbook, page);
-      var p = parsePage(page);
-      if (p === null && flipbook) p = parsePage(flipbook.currentPage || flipbook.page);
-      handlePageChange(p !== null ? p : readPageFromDOM());
-    };
+    wrapCb(d.onFlip,     'onFlip');
+    wrapCb(d.onChange,   'onChange');
+    wrapCb(d.onPageLoad, 'onPageLoad');
   }
 
-  // Start hooking as early as possible
   initDFlipHooks();
-
-  // Keep overlay in position if the window is resized
-  window.addEventListener('resize', positionOverlay);
 })();
 </script>
 </body>
