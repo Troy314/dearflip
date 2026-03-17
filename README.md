@@ -5,6 +5,8 @@ This repo is public for the purpose of:
 
 Note: DearFlip is a front end javascript pdf viewer/flipbook solution and is also implemented in Wordpress/chrome/joomla for it's easy use in their respective environment.
 
+[Test](examples/basic-example%20(Copy).html)
+
 [![](https://raw.githubusercontent.com/dearhive/dearflip-js-flipbook/refs/heads/master/dflip/images/get-it-from-MS.png)](https://apps.microsoft.com/detail/9pbts872dnc6?hl=en-US)
 [![](https://raw.githubusercontent.com/dearhive/dearflip-js-flipbook/refs/heads/master/dflip/images/chrome-extension.png)](https://chromewebstore.google.com/detail/dearpdf/bbbnbmpdkfkndckfmcndgabefnmdedfp)
 
