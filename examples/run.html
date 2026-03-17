@@ -97,7 +97,7 @@
    * We check both the standard jQuery data key and a DOM attribute.
    */
   function syncOverlay() {
-    var currentPage = 2; // default assumption
+    var currentPage = 1; // default assumption
 
     // Try to read from DFlip's jQuery data (key varies by version)
     if (window.jQuery) {
@@ -111,7 +111,7 @@
     }
 
     // Page 1 → show overlay; any other page → hide
-    if (currentPage === 1) {
+    if (currentPage === 2) {
       overlay.classList.add('visible');
     } else {
       overlay.classList.remove('visible');
